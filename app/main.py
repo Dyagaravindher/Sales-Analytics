@@ -4,8 +4,10 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Sale
+from app.routers import sales
 
 app = FastAPI(title="Sales Analytics API")
+app.include_router(sales.router)
 
 
 @app.get("/")
