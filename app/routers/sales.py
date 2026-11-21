@@ -52,3 +52,78 @@ def top_products(
         .all()
     )
     return [{"product_name": name, "total_sales": round(amount, 2)} for name, amount in rows]
+
+
+@router.get("/sales-by-region")
+def sales_by_region(db: Session = Depends(get_db)):
+    total = func.sum(Sale.sales).label("total_sales")
+    rows = (
+        db.query(Sale.region, total)
+        .group_by(Sale.region)
+        .order_by(total.desc())
+        .all()
+    )
+    return [{"region": region, "total_sales": round(amount, 2)} for region, amount in rows]
+
+
+@router.get("/sales-by-category")
+def sales_by_category(db: Session = Depends(get_db)):
+    total = func.sum(Sale.sales).label("total_sales")
+    rows = (
+        db.query(Sale.category, total)
+        .group_by(Sale.category)
+        .order_by(total.desc())
+        .all()
+    )
+    return [{"category": category, "total_sales": round(amount, 2)} for category, amount in rows]
+
+
+@router.get("/yearly-sales")
+def yearly_sales(db: Session = Depends(get_db)):
+    rows = (
+        db.query(Sale.year, func.sum(Sale.sales))
+        .group_by(Sale.year)
+        .order_by(Sale.year)
+        .all()
+    )
+    return [{"year": year, "total_sales": round(amount, 2)} for year, amount in rows]
+
+
+@router.get("/sales")
+def list_sales(
+    region: str | None = None,
+    category: str | None = None,
+    year: int | None = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Sale)
+
+    if region:
+        query = query.filter(Sale.region == region)
+    if category:
+        query = query.filter(Sale.category == category)
+    if year:
+        query = query.filter(Sale.year == year)
+
+    total_rows = query.count()
+    rows = query.order_by(Sale.order_date, Sale.id).offset(skip).limit(limit).all()
+
+    return {
+        "total_matching_rows": total_rows,
+        "skip": skip,
+        "limit": limit,
+        "results": [
+            {
+                "order_id": r.order_id,
+                "order_date": r.order_date,
+                "customer_name": r.customer_name,
+                "region": r.region,
+                "category": r.category,
+                "product_name": r.product_name,
+                "sales": r.sales,
+            }
+            for r in rows
+        ],
+    }
